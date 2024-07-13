@@ -36,3 +36,8 @@ Checking if the dumped data in source postgres DB is getting transferred to Dest
 3. Navigate to the repository directory and run `docker-compose up`.
 4. Once all containers are up and running, the ELT process will start automatically.
 5. After the ELT process completes, you can access the source and destination PostgreSQL databases on ports 5433 and 5434, respectively.
+
+## DBT
+
+To automate the script to run every day we can use DBT. DBT is a open source tool we can utilise to write custom transformations, custom models.
+
