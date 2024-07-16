@@ -41,3 +41,19 @@ Checking if the dumped data in source postgres DB is getting transferred to Dest
 
 To automate the script to run every day we can use DBT. DBT is a open source tool we can utilise to write custom transformations, custom models.
 
+## CRON Job Implementation
+
+In this branch, a CRON job has been implemented to automate the ELT process. The CRON job is scheduled to run the ELT script at specified intervals, ensuring that the data in the destination PostgreSQL database is regularly updated with the latest data from the source database.
+
+To configure the CRON job:
+
+1. Currently, the CRON job is setup to run every day at 10am.
+2. You can adjust the time as needed within the Dockerfile found in the `elt` folder.
+
+## Getting Started
+
+1. Ensure you have Docker and Docker Compose installed on your machine.
+2. Clone this repository.
+3. Navigate to the repository directory and run `docker-compose up`.
+4. Once all containers are up and running, the ELT process will start automatically.
+5. After the ELT process completes, you can access the source and destination PostgreSQL databases on ports 5433 and 5434, respectively.
