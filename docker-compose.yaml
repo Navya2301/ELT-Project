@@ -1,7 +1,7 @@
 version: '3'
 services:
   source_postgres:
-    image: postgres:9.2
+    image: postgres:latest
     ports:
       - "5433:5432"
     networks:
@@ -13,7 +13,7 @@ services:
     volumes:
       - ./source_db/init.sql:/docker-entrypoint-initdb.d/init.sql
   destination_postgres:
-    image: postgres:9.2
+    image: postgres:latest
     ports:
       - "5434:5432"
     networks:
@@ -22,42 +22,130 @@ services:
       POSTGRES_DB: destination_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
-  elt_script:
-    build:
-      context: ./elt
-      dockerfile: Dockerfile
-    command: ["python", "elt_script.py"]
+  # elt_script:
+  #   build:
+  #     context: ./elt
+  #     dockerfile: Dockerfile
+  #   command: ["python", "elt_script.py"]
+  #   networks:
+  #     - elt_network
+  #   depends_on:
+  #     - source_postgres
+  #     - destination_postgres
+  # dbt:
+  #   image: ghcr.io/dbt-labs/dbt-postgres:1.5.0
+  #   command:
+  #     [
+  #       "run",
+  #       "--profiles-dir",
+  #       "/root",
+  #       "--project-dir",
+  #       "/dbt"
+  #     ]
+  #   networks:
+  #     - elt_network
+  #   volumes:
+  #     - ./custom_postgres:/dbt
+  #     - ~/.dbt:/root
+  #   depends_on:
+  #     - elt_script
+  #   environment:
+  #     DBT_PROFILE: default
+  #     DBT_TARGET: dev
+  # this database is for airflow to store all it's metadata and logs
+  postgres:
+    image: postgres:latest
     networks:
       - elt_network
-    depends_on:
-      - source_postgres
-      - destination_postgres
-  dbt:
-    image: ghcr.io/dbt-labs/dbt-postgres:1.5.0
-    command:
-      [
-        "run",
-        "--profiles-dir",
-        "/root",
-        "--project-dir",
-        "/dbt"
-
-      ]
-    networks:
-      - elt_network
-    volumes:
-      - ./custom_postgres:/dbt
-      - ~/.dbt:/root
-    depends_on:
-      - elt_script
     environment:
-      DBT_PROFILE: default
-      DBT_TARGET: dev
-      
-    
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
 
-
-
+  
+  # intitalising the user and database we created all together for airflow
+  init-airflow:
+    image: apache/airflow:latest
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    environment:
+    # Connection string for the database that Apache Airflow will use
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # postgres+psycopg2: This specifies the database dialect and the driver. 
+      # In this case, it indicates that a PostgreSQL database will be used with the psycopg2 driver
+      # //airflow:airflow@postgres/airflow -- //<database-username>@<hostname>/<db name>
+    command: >
+      bash -c "airflow db init &&
+       airflow users create --username airflow --password secret --firstname Navya --lastname Racha --role Admin --email navyasri.racha@gmail.com "
+  
+  # UI of airflow
+  webserver:
+    # we need to create a docker file for this - which we created in the root directory
+    # we use that ti build the image
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./elt:/opt/airflow/elt
+      - ./custom_postgres:/opt/dbt
+      - ~/.dbt:/root/.dbt
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - LOAD_EX=n
+      - EXCECUTOR=local
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # the below key is used for the encryption safe
+      - AIRFLOW__CORE__FERNET_KEY=88Rz2qffSPY0bTPnHukEv2q4rm0l2lGLHMgGw2DeyEo=
+      - AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME=airflow
+      - AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD=password
+      - AIRFLOW_WWW_USER_USERNAME=airflow
+      - AIRFLOW_WWW_USER_PASSWORD=password
+      - AIRFLOW__WEBSERVER__SECRET_KEY=secret
+    ports:
+      - "8080:8080"
+    command: webserver
+  # This is needed to schedule all the jobs
+  scheduler:
+    # we need to create a docker file for this - which we created in the root directory
+    # we use that ti build the image
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    depends_on:
+      - postgres
+    networks:
+      - elt_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./elt:/opt/airflow/elt
+      - ./custom_postgres:/opt/dbt
+      - ~/.dbt:/root/.dbt
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - LOAD_EX=n
+      - EXCECUTOR=local
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # the below key is used for the encryption safe
+      - AIRFLOW__CORE__FERNET_KEY=88Rz2qffSPY0bTPnHukEv2q4rm0l2lGLHMgGw2DeyEo=
+      - AIRFLOW__WEBSERVER__DEFAULT_USER_USERNAME=airflow
+      - AIRFLOW__WEBSERVER__DEFAULT_USER_PASSWORD=password
+      - AIRFLOW_WWW_USER_USERNAME=airflow
+      - AIRFLOW_WWW_USER_PASSWORD=password
+      - AIRFLOW__WEBSERVER__SECRET_KEY=secret
+    command: scheduler
 networks:
   elt_network:
     driver: bridge
