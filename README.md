@@ -29,13 +29,7 @@ Checking if the dumped data in source postgres DB is getting transferred to Dest
 
 3. **Database Initialization**: The `init.sql` script initializes the source database with sample data. It creates several tables and populates them with sample data.
 
-## Getting Started
 
-1. Ensure you have Docker installed on your computer.
-2. Clone this repository.
-3. Navigate to the repository directory and run `docker-compose up`.
-4. Once all containers are up and running, the ELT process will start automatically.
-5. After the ELT process completes, you can access the source and destination PostgreSQL databases on ports 5433 and 5434, respectively.
 
 ## DBT
 
@@ -57,3 +51,8 @@ To configure the CRON job:
 3. Navigate to the repository directory and run `docker-compose up`.
 4. Once all containers are up and running, the ELT process will start automatically.
 5. After the ELT process completes, you can access the source and destination PostgreSQL databases on ports 5433 and 5434, respectively.
+
+## Airbyte
+ -- A data movement platform
+
+1. 
